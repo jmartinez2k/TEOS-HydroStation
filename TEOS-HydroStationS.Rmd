@@ -66,6 +66,103 @@ hydrostation_bottle %>%
 ```
 
 
+## TEOS-10 Toolbox in Package Seacarb
+
+```{r}
+?gsw #launches documentation for gibbs seawater toolbox
+? gsw_sigma0 # lets check this function 
+# it says we need absolute salinity and conservative temperature
+
+#first we need absolute salinity
+
+?gsw_SA_from_SP
+#practical salinity
+#sea pressure(dbar)
+#longitude
+#latitude
+
+#plot our pressure data - its missing before 1980s
+hydrostation_bottle %>% 
+  ggplot()+geom_point(aes(x=decy,y=Pres))
+
+#we have depth for the time series
+hydrostation_bottle %>% 
+  ggplot()+
+  geom_point(aes(x=decy, y=Depth))
+
+#adds a pressure column from depth and latN columns from/to hydrostation bottle
+hydrostation_bottle = 
+  hydrostation_bottle %>% 
+  mutate(Pres_gsw = gsw_p_from_z(Depth*-1,latN,))
+
+hydrostation_bottle %>% 
+  ggplot()+geom_point(aes(x=Pres,y=Pres_gsw))
+# we see strong 1:1 agreement between measured pressure and calculated pressure
+
+hydrostation_bottle %>% 
+  ggplot()+geom_point(aes(x=decy,y=latN))
+
+hydrostation_bottle = 
+  hydrostation_bottle %>% 
+  mutate(Pres_gsw = gsw_p_from_z(Depth*-1,latN,)) %>% 
+  mutate(S_abs_gsw=gsw_SA_from_SP(Sal1,Pres_gsw,360-lonW,latN))
+#plot it
+hydrostation_bottle %>% 
+  filter(Sal1!=-999) %>% 
+  ggplot()+
+  geom_point(aes(x=Sal1,y=S_abs_gsw))
+# now we need to calculate conservative temperature
+# we need absolute salinity, insitu temp (ITS-90), and sea pressure
+hydroS =
+  hydrostation_bottle %>% 
+  filter(Sal1!=-999) %>%
+  mutate(Pres_gsw = gsw_p_from_z(Depth*-1,latN,)) %>% 
+  mutate(S_abs_gsw=gsw_SA_from_SP(Sal1,Pres_gsw,360-lonW,latN)) %>% 
+  mutate(T_cons_gsw = gsw_CT_from_t(S_abs_gsw,Temp,Pres_gsw))
+
+hydroS %>% 
+  filter(Temp!= -999) %>% 
+  ggplot()+
+  geom_point(aes(x=Temp, y =T_cons_gsw))
+
+#add line to calculate conservative temperature
+hydroS =
+  hydrostation_bottle %>% 
+  filter(Sal1!=-999) %>%
+  mutate(Pres_gsw = gsw_p_from_z(Depth*-1,latN,)) %>% 
+  mutate(S_abs_gsw=gsw_SA_from_SP(Sal1,Pres_gsw,360-lonW,latN)) %>% 
+  mutate(T_cons_gsw = gsw_CT_from_t(S_abs_gsw,Temp,Pres_gsw)) %>% 
+  mutate(Sig_th_gsw = gsw_sigma0(S_abs_gsw,T_cons_gsw))
+
+hydroS %>% 
+  filter(`Sig-th`!= -999) %>% 
+  ggplot()+
+  geom_point(aes(x=`Sig-th`, y=Sig_th_gsw))
+
+hydroS %>% 
+  filter(Sig_th_gsw<0)
+  #view()
+
+hydroS_correctedS_a =
+  hydroS %>% 
+  filter(Sig_th_gsw<0) %>%
+  mutate(S_abs_gsw=gsw_SA_from_SP(CTD_S,Pres_gsw,360-lonW,latN)) %>% 
+  mutate(T_cons_gsw = gsw_CT_from_t(S_abs_gsw,Temp,Pres_gsw)) %>% 
+  mutate(Sig_th_gsw = gsw_sigma0(S_abs_gsw,T_cons_gsw)) 
+
+
+hydroS_correctedS_b =
+  hydroS %>% 
+  filter(Sig_th_gsw>0)
+
+hydroS_corrected = rbind(hydroS_correctedS_a, hydroS_correctedS_b)
+
+hydroS_corrected %>% 
+  filter(`Sig-th`!= -999) %>% 
+  ggplot()+
+  geom_point(aes(x=`Sig-th`, y=Sig_th_gsw))
+```
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
