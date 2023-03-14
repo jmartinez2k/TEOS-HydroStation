@@ -143,6 +143,8 @@ hydroS %>%
   filter(Sig_th_gsw<0)
   #view()
 
+
+# how to replace data in a line without making this many dataframes (i.e. select and/or filters)
 hydroS_correctedS_a =
   hydroS %>% 
   filter(Sig_th_gsw<0) %>%
@@ -161,7 +163,75 @@ hydroS_corrected %>%
   filter(`Sig-th`!= -999) %>% 
   ggplot()+
   geom_point(aes(x=`Sig-th`, y=Sig_th_gsw))
+
+## Next day
+hydroS_corrected %>% 
+  ggplot()+
+  geom_point(aes(x=Sig_th_gsw, y = Depth))+
+  scale_y_reverse()+
+  scale_x_continuous(position ="top")+
+  xlab(expression(paste(sigma[theta]," (kg m"^"-3",")")))+
+  ylab("Depth(m)")
+
 ```
+
+
+
+
+
+# Has surface sigma theta decreased over time?
+
+```{r}
+hydroS_shallow = hydroS_corrected %>% 
+  filter(Depth<30)
+
+sig_theta_tm = lm(Sig_th_gsw~decy,data =  hydroS_shallow) # y (Sig) is a function of x(decy), lm(y~x,data = data )
+summary(sig_theta_tm)
+library(plotly)
+
+plot = hydroS_shallow %>% 
+  ggplot()+
+  geom_point(aes(x=decy, y=Sig_th_gsw))+
+  geom_line(aes(x=decy, y=Sig_th_gsw))+
+  geom_smooth(aes(x=decy, y=Sig_th_gsw),method = "lm")+
+  theme_classic()
+ggplotly(plot)
+
+#y=mx + b
+
+#y = Sig_th_gsw
+#x - decy
+#coeffiecients: intercept = b, decy = m
+#Sig_th_gsw = -0004*decy + 33.4
+```
+
+
+#Lab Assignment
+1. Pick a question (include hypothesis)
+
+How does oxygen look like at depth and over time? 
+H1 : Oxygen reaches a max in the upper 1000m before decreasing with further depth
+
+2. Produce a plot and statistal summary using lm()
+```{r}
+
+
+o2_h = hydroS_corrected %>% 
+  filter(`O2(1)`!= -999)
+o2_h = 
+  ggplot()+
+  geom_point(aes(x=`O2(1)`,y = Depth))
+```
+
+3. Describe your results, the summary, and answer the question
+4. Compile into a completed lab report using R markdown
+
+Potential Questions :
+  
+  How do temperature, salinity, and sigma-theta co-vary?
+  Is there a relationship betwen sigma-theta and oxygen?
+  Is there a relationship of any of the parameters with depth? With time?  Within a depth range over time?
+  Are there seasonal differences in any of the parameters?
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -184,5 +254,4 @@ You can also embed plots, for example:
 ```{r pressure, echo=FALSE}
 plot(pressure)
 ```
-
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
