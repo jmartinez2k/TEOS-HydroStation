@@ -1,0 +1,105 @@
+---
+title: "Oxygen over time : TEOS Hydrostation S Data Lab"
+author: "Jose Martinez"
+date: "2023-03-16"
+output: html_document
+---
+# Load required libraries
+```{r setup, include=FALSE}
+library(prettydoc)
+library(tidyverse)
+library(gsw)
+library(readr)
+library(plotly)
+```
+
+## Now we need to import our data
+```{r message = FALSE, warning = FALSE}
+hydrostation_bottle <- read_delim("hydrostation_bottle.txt", 
+    delim = "\t", escape_double = FALSE, 
+    col_names = FALSE, trim_ws = TRUE, skip = 31)
+
+hydrostation_bottle_names <- read_csv("hydrostation_bottle.txt", 
+    skip = 30)
+
+colnames(hydrostation_bottle) = colnames(hydrostation_bottle_names)
+```
+## Hydrostation S Discrete Bottle Data for years 1955 through December 2020.
+
+### Variable Names and Units
+
+- yyyymmdd = Year Month Day   
+- decy   = Decimal Year     
+- time   = Time (hhmm)      
+- latN   = Latitude (Deg N) 
+- lonW   = Longitude (Deg W)
+- Depth  = Depth (m)                  
+-Temp   = Temperature ITS-90 (C) 
+- Pres   = CTD Pressure (dbar)   
+- CTD_S  = CTD Salinity (PSS-78)      
+- Sal1   = Salinity-1 (PSS-78)        
+- Sig-th = Sigma-Theta (kg/m^3)       
+- O2(1)  = Oxygen-1 (umol/kg)          
+- OxFixT = Oxygen Fix Temp (C)        
+- Anom1  = Oxy Anomaly-1 (umol/kg)    
+Quality flags
+- -999  = No data
+- 0 = Less than detection limit
+```{r}
+hydroS =
+  hydrostation_bottle %>% 
+  filter(Sal1!=-999) %>%
+  mutate(Pres_gsw = gsw_p_from_z(Depth*-1,latN,)) %>% 
+  mutate(S_abs_gsw=gsw_SA_from_SP(Sal1,Pres_gsw,360-lonW,latN)) %>% 
+  mutate(T_cons_gsw = gsw_CT_from_t(S_abs_gsw,Temp,Pres_gsw)) %>% 
+  mutate(Sig_th_gsw = gsw_sigma0(S_abs_gsw,T_cons_gsw))
+
+# how to replace data in a line without making this many dataframes (i.e. select and/or filters)
+hydroS_correctedS_a =
+  hydroS %>% 
+  filter(Sig_th_gsw<0) %>%
+  mutate(S_abs_gsw=gsw_SA_from_SP(CTD_S,Pres_gsw,360-lonW,latN)) %>% 
+  mutate(T_cons_gsw = gsw_CT_from_t(S_abs_gsw,Temp,Pres_gsw)) %>% 
+  mutate(Sig_th_gsw = gsw_sigma0(S_abs_gsw,T_cons_gsw)) 
+
+
+hydroS_correctedS_b =
+  hydroS %>% 
+  filter(Sig_th_gsw>0)
+
+hydroS_corrected = rbind(hydroS_correctedS_a, hydroS_correctedS_b) 
+```
+#Lab Assignment
+1. Pick a question (include hypothesis)
+
+How does oxygen behave over time? 
+H1 : Oxygen reaches a min in the upper 1000m before increasing with further depth
+
+2. Produce a plot and statistical summary using lm()
+```{r}
+o2_ht = 
+  hydroS_corrected %>% 
+  filter(`O2(1)`!= -999) %>% 
+  filter(Depth < 50)
+
+plot_o2vt = o2_ht %>% 
+  ggplot()+
+  geom_point(aes(x=decy,y = `O2(1)`))+
+  ylab('Oxygen (µmol/kg)')+
+  xlab('Time')+
+  geom_smooth(aes(x=decy, y=`O2(1)`),method = "lm")
+
+plot_o2vt
+
+oxygen_time = lm(`O2(1)`~decy,data =  o2_ht) # y (Sig) is a function of x(decy), lm(y~x,data = data )
+summary(oxygen_time)
+```
+
+## Lab Assignment
+
+
+3. Describe your results, the summary, and answer the question
+
+Oxygen ranges from a low of 155.8 umol/kg to a maximum of 270.5 umol/kg over the late 1960s to present day. We see higher oxygen values from the mid 1980s to the mid 1990s which can be an indicator of a positive NAO in contrast to the probable negative NAO trend that followed the mid 1990s into present. In the summary statisitics we see a slight negative slope of oxygen over time that is not statistically significant but is a probable indicator of anthropogenic climate change lowering oxygen content in the North Atlantic.
+
+4. Compile into a completed lab report using R markdown

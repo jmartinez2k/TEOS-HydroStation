@@ -14,6 +14,7 @@ library(prettydoc)
 library(tidyverse)
 library(gsw)
 library(readr)
+library(plotly)
 ```
 
 ## Now we need to import our data
@@ -157,7 +158,8 @@ hydroS_correctedS_b =
   hydroS %>% 
   filter(Sig_th_gsw>0)
 
-hydroS_corrected = rbind(hydroS_correctedS_a, hydroS_correctedS_b)
+hydroS_corrected = rbind(hydroS_correctedS_a, hydroS_correctedS_b) 
+
 
 hydroS_corrected %>% 
   filter(`Sig-th`!= -999) %>% 
@@ -187,7 +189,7 @@ hydroS_shallow = hydroS_corrected %>%
 
 sig_theta_tm = lm(Sig_th_gsw~decy,data =  hydroS_shallow) # y (Sig) is a function of x(decy), lm(y~x,data = data )
 summary(sig_theta_tm)
-library(plotly)
+
 
 plot = hydroS_shallow %>% 
   ggplot()+
@@ -210,17 +212,27 @@ ggplotly(plot)
 1. Pick a question (include hypothesis)
 
 How does oxygen look like at depth and over time? 
-H1 : Oxygen reaches a max in the upper 1000m before decreasing with further depth
+H1 : Oxygen reaches a min in the upper 1000m before increasing with further depth
 
-2. Produce a plot and statistal summary using lm()
+2. Produce a plot and statistical summary using lm()
 ```{r}
 
 
 o2_h = hydroS_corrected %>% 
-  filter(`O2(1)`!= -999)
-o2_h = 
+  filter(`O2(1)`!= -999) %>% 
+  filter(Depth < 50)
+  #mutate(month = substr(yyyymmd,5,6))
+ #mutate(month=as.numeric(substr(yyyymmd,5,6))) %>% 
+  #mutate(season =ifelse(month==12|month==1|month==2|month==3,'winter',ifelse(month==8|month==9|month==10,'summer',''))) # adds seasons to data
+
+o2_h %>% 
   ggplot()+
-  geom_point(aes(x=`O2(1)`,y = Depth))
+  geom_point(aes(x=`O2(1)`,y = Depth))+
+  xlab('Oxygen (µmol/kg)')+
+  ylab('Depth (m)')+
+  scale_y_reverse()+
+  scale_x_continuous(position ="top")
+o2_h
 ```
 
 3. Describe your results, the summary, and answer the question
@@ -232,6 +244,41 @@ Potential Questions :
   Is there a relationship betwen sigma-theta and oxygen?
   Is there a relationship of any of the parameters with depth? With time?  Within a depth range over time?
   Are there seasonal differences in any of the parameters?
+```{r}
+o2_ht = 
+  hydroS_corrected %>% 
+  filter(Sal1!= -999) %>% 
+  filter(Sal1 > 2) %>% # broken electrode on salinity measuring device
+  filter(`O2(1)`!= -999) %>% 
+  filter(Depth < 50)
+ 
+plot_1 = o2_ht %>% 
+  ggplot()+
+  geom_point(aes(x = `O2(1)`,y=Sal1))+
+  xlab('Oxygen (µmol/kg)')+
+  ylab('Salinity')+
+  geom_smooth(aes(x=`O2(1)`, y=Sal1,),method = "lm")
+
+plot_1
+
+
+
+
+plot_2 = o2_ht %>% 
+  ggplot()+
+  geom_point(aes(x=decy,y = `O2(1)`))+
+  ylab('Oxygen (µmol/kg)')+
+  xlab('Time')+
+  geom_smooth(aes(x=decy, y=`O2(1)`),method = "lm")
+
+plot_2
+
+oxygen_time = lm(`O2(1)`~decy,data =  o2_ht) # y (Sig) is a function of x(decy), lm(y~x,data = data )
+summary(oxygen_time)
+
+oxygen_sal = lm(`O2(1)`~Sal1,data =  o2_ht) # y (Sig) is a function of x(decy), lm(y~x,data = data )
+summary(oxygen_sal)
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
